@@ -208,6 +208,7 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
         }}
         self.stack._hooks = {}
         self.stack.config["role_arn"] = sentinel.role_arn
+        self.stack.config["notifications"] = [sentinel.notification]
         self.stack.create()
 
         self.stack.connection_manager.call.assert_called_with(
@@ -219,6 +220,46 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
                 "Parameters": sentinel.parameters,
                 "Capabilities": ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM'],
                 "RoleARN": sentinel.role_arn,
+                "NotificationARNs": [sentinel.notification],
+                "Tags": [
+                    {"Key": "tag1", "Value": "val1"}
+                ]
+            }
+        )
+        mock_wait_for_completion.assert_called_once_with()
+
+    @patch("sceptre.stack.Stack._format_parameters")
+    @patch("sceptre.stack.Stack._wait_for_completion")
+    @patch("sceptre.stack.Stack._get_template_details")
+    def test_create_sends_correct_request_no_notifications(
+            self, mock_get_template_details,
+            mock_wait_for_completion, mock_format_params
+    ):
+        mock_format_params.return_value = sentinel.parameters
+        mock_get_template_details.return_value = {
+            "Template": sentinel.template
+        }
+        self.stack.environment_config = {
+            "template_bucket_name": sentinel.template_bucket_name,
+            "template_key_prefix": sentinel.template_key_prefix
+        }
+        self.stack._config = {"stack_tags": {
+            "tag1": "val1"
+        }}
+        self.stack._hooks = {}
+        self.stack.config["role_arn"] = sentinel.role_arn
+        self.stack.create()
+
+        self.stack.connection_manager.call.assert_called_with(
+            service="cloudformation",
+            command="create_stack",
+            kwargs={
+                "StackName": sentinel.external_name,
+                "Template": sentinel.template,
+                "Parameters": sentinel.parameters,
+                "Capabilities": ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM'],
+                "RoleARN": sentinel.role_arn,
+                "NotificationARNs": [],
                 "Tags": [
                     {"Key": "tag1", "Value": "val1"}
                 ]
@@ -246,6 +287,7 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
         }}
         self.stack._hooks = {}
         self.stack.config["role_arn"] = sentinel.role_arn
+        self.stack.config["notifications"] = [sentinel.notification]
         self.stack.config["on_failure"] = 'DO_NOTHING'
         self.stack.create()
 
@@ -258,6 +300,7 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
                 "Parameters": sentinel.parameters,
                 "Capabilities": ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM'],
                 "RoleARN": sentinel.role_arn,
+                "NotificationARNs": [sentinel.notification],
                 "Tags": [
                     {"Key": "tag1", "Value": "val1"}
                 ],
@@ -286,6 +329,7 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
         }}
         self.stack._hooks = {}
         self.stack.config["role_arn"] = sentinel.role_arn
+        self.stack.config["notifications"] = [sentinel.notification]
 
         self.stack.update()
         self.stack.connection_manager.call.assert_called_with(
@@ -297,6 +341,46 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
                 "Parameters": sentinel.parameters,
                 "Capabilities": ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM'],
                 "RoleARN": sentinel.role_arn,
+                "NotificationARNs": [sentinel.notification],
+                "Tags": [
+                    {"Key": "tag1", "Value": "val1"}
+                ]
+            }
+        )
+        mock_wait_for_completion.assert_called_once_with()
+
+    @patch("sceptre.stack.Stack._format_parameters")
+    @patch("sceptre.stack.Stack._wait_for_completion")
+    @patch("sceptre.stack.Stack._get_template_details")
+    def test_update_sends_correct_request_no_notification(
+            self, mock_get_template_details,
+            mock_wait_for_completion, mock_format_params
+    ):
+        mock_format_params.return_value = sentinel.parameters
+        mock_get_template_details.return_value = {
+            "Template": sentinel.template
+        }
+        self.stack.environment_config = {
+            "template_bucket_name": sentinel.template_bucket_name,
+            "template_key_prefix": sentinel.template_key_prefix
+        }
+        self.stack._config = {"stack_tags": {
+            "tag1": "val1"
+        }}
+        self.stack._hooks = {}
+        self.stack.config["role_arn"] = sentinel.role_arn
+
+        self.stack.update()
+        self.stack.connection_manager.call.assert_called_with(
+            service="cloudformation",
+            command="update_stack",
+            kwargs={
+                "StackName": sentinel.external_name,
+                "Template": sentinel.template,
+                "Parameters": sentinel.parameters,
+                "Capabilities": ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM'],
+                "RoleARN": sentinel.role_arn,
+                "NotificationARNs": [],
                 "Tags": [
                     {"Key": "tag1", "Value": "val1"}
                 ]
@@ -558,58 +642,6 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
         response = self.stack.describe_outputs()
         assert response == []
 
-    @pytest.mark.parametrize(
-        "local_template,remote_template,diff_remote_local,diff_local_remote",
-        [
-            (
-                "local_template_content",
-                "remote_template_content",
-                "--- remote_template\n+++ local_template\n@@ -1 +1 @@\n-remote_template_content\n+local_template_content\n",  # NOQA
-                "--- remote_template\n+++ local_template\n@@ -1 +1 @@\n-local_template_content\n+remote_template_content\n"   # NOQA
-            ),
-            (
-                "template_content\nonlylocal_content",
-                "template_content",
-                "--- remote_template\n+++ local_template\n@@ -1 +1,2 @@\n template_content\n+onlylocal_content\n",  # NOQA
-                "--- remote_template\n+++ local_template\n@@ -1,2 +1 @@\n template_content\n-onlylocal_content\n"   # NOQA
-            ),
-            (
-                "onlylocal_content\ntemplate_content",
-                "template_content",
-                "--- remote_template\n+++ local_template\n@@ -1 +1,2 @@\n+onlylocal_content\n template_content\n",  # NOQA
-                "--- remote_template\n+++ local_template\n@@ -1,2 +1 @@\n-onlylocal_content\n template_content\n"   # NOQA
-            ),
-            (
-                "template_content1\nonlylocal_content\ntemplate_content2",
-                "template_content1\ntemplate_content2",
-                "--- remote_template\n+++ local_template\n@@ -1,2 +1,3 @@\n template_content1\n+onlylocal_content\n template_content2\n",  # NOQA
-                "--- remote_template\n+++ local_template\n@@ -1,3 +1,2 @@\n template_content1\n-onlylocal_content\n template_content2\n"   # NOQA
-            ),
-            (
-                "template_content1\nonlylocal_content\ntemplate_content2",
-                "template_content1\nonlyremote_content\ntemplate_content2",
-                "--- remote_template\n+++ local_template\n@@ -1,3 +1,3 @@\n template_content1\n-onlyremote_content\n+onlylocal_content\n template_content2\n",  # NOQA
-                "--- remote_template\n+++ local_template\n@@ -1,3 +1,3 @@\n template_content1\n-onlylocal_content\n+onlyremote_content\n template_content2\n"   # NOQA
-            ),
-        ]
-    )
-    def test_diff_stack_cases(self, local_template, remote_template,
-                              diff_remote_local, diff_local_remote):
-        self.stack._template = Mock(spec=Template)
-        self.stack._template.body = local_template
-        self.stack.connection_manager.call.return_value = {
-            "TemplateBody": remote_template
-            }
-        response = self.stack.diff()
-        assert response == diff_remote_local
-
-        self.stack._template.body = remote_template
-        self.stack.connection_manager.call.return_value = {
-            "TemplateBody": local_template
-            }
-        response = self.stack.diff()
-        assert response == diff_local_remote
-
     def test_continue_update_rollback_sends_correct_request(self):
         self.stack._config = {
             "template_path": sentinel.template_path,
@@ -690,6 +722,7 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
             "stack_tags": {"tag1": "val1"}
         }
         self.stack.config["role_arn"] = sentinel.role_arn
+        self.stack.config["notifications"] = [sentinel.notification]
 
         self.stack.create_change_set(sentinel.change_set_name)
         self.stack.connection_manager.call.assert_called_with(
@@ -702,6 +735,43 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
                 "Capabilities": ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM'],
                 "ChangeSetName": sentinel.change_set_name,
                 "RoleARN": sentinel.role_arn,
+                "NotificationARNs": [sentinel.notification],
+                "Tags": [
+                    {"Key": "tag1", "Value": "val1"}
+                ]
+            }
+        )
+
+    @patch("sceptre.stack.Stack._format_parameters")
+    @patch("sceptre.stack.Stack._get_template_details")
+    def test_create_change_set_sends_correct_request_no_notifications(
+            self, mock_get_template_details, mock_format_params
+    ):
+        mock_format_params.return_value = sentinel.parameters
+        mock_get_template_details.return_value = {
+            "Template": sentinel.template
+        }
+        self.stack.environment_config = {
+            "template_bucket_name": sentinel.template_bucket_name,
+            "template_key_prefix": sentinel.template_key_prefix
+        }
+        self.stack._config = {
+            "stack_tags": {"tag1": "val1"}
+        }
+        self.stack.config["role_arn"] = sentinel.role_arn
+
+        self.stack.create_change_set(sentinel.change_set_name)
+        self.stack.connection_manager.call.assert_called_with(
+            service="cloudformation",
+            command="create_change_set",
+            kwargs={
+                "StackName": sentinel.external_name,
+                "Template": sentinel.template,
+                "Parameters": sentinel.parameters,
+                "Capabilities": ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM'],
+                "ChangeSetName": sentinel.change_set_name,
+                "RoleARN": sentinel.role_arn,
+                "NotificationARNs": [],
                 "Tags": [
                     {"Key": "tag1", "Value": "val1"}
                 ]
@@ -754,20 +824,6 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
             kwargs={"StackName": sentinel.external_name}
         )
 
-    def test_diff_stack_sends_correct_request(self):
-        self.stack._template = Mock(spec=Template)
-        self.stack._template.body = "local_template_content"
-
-        self.stack.connection_manager.call.return_value = \
-            {"TemplateBody": "remote_template_content"}
-
-        self.stack.diff()
-        self.stack.connection_manager.call.assert_called_with(
-            service="cloudformation",
-            command="get_template",
-            kwargs={"StackName": sentinel.external_name}
-        )
-
     @patch("sceptre.stack.Stack.set_policy")
     @patch("os.path.join")
     def test_lock_calls_set_stack_policy_with_policy(
@@ -797,11 +853,15 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
             "key3": "value3"
         }
         formatted_parameters = self.stack._format_parameters(parameters)
-        assert sorted(formatted_parameters) == sorted([
+        sorted_formatted_parameters = sorted(
+            formatted_parameters,
+            key=lambda x: x["ParameterKey"]
+        )
+        assert sorted_formatted_parameters == [
             {"ParameterKey": "key1", "ParameterValue": "value1"},
             {"ParameterKey": "key2", "ParameterValue": "value2"},
             {"ParameterKey": "key3", "ParameterValue": "value3"}
-        ])
+        ]
 
     def test_format_parameters_with_none_values(self):
         parameters = {
@@ -810,7 +870,11 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
             "key3": None
         }
         formatted_parameters = self.stack._format_parameters(parameters)
-        assert sorted(formatted_parameters) == []
+        sorted_formatted_parameters = sorted(
+            formatted_parameters,
+            key=lambda x: x["ParameterKey"]
+        )
+        assert sorted_formatted_parameters == []
 
     def test_format_parameters_with_none_and_string_values(self):
         parameters = {
@@ -819,10 +883,14 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
             "key3": "value3"
         }
         formatted_parameters = self.stack._format_parameters(parameters)
-        assert sorted(formatted_parameters) == sorted([
+        sorted_formatted_parameters = sorted(
+            formatted_parameters,
+            key=lambda x: x["ParameterKey"]
+        )
+        assert sorted_formatted_parameters == [
             {"ParameterKey": "key1", "ParameterValue": "value1"},
             {"ParameterKey": "key3", "ParameterValue": "value3"}
-        ])
+        ]
 
     def test_format_parameters_with_list_values(self):
         parameters = {
@@ -831,11 +899,15 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
             "key3": ["value7", "value8", "value9"]
         }
         formatted_parameters = self.stack._format_parameters(parameters)
-        assert sorted(formatted_parameters) == sorted([
+        sorted_formatted_parameters = sorted(
+            formatted_parameters,
+            key=lambda x: x["ParameterKey"]
+        )
+        assert sorted_formatted_parameters == [
             {"ParameterKey": "key1", "ParameterValue": "value1,value2,value3"},
             {"ParameterKey": "key2", "ParameterValue": "value4,value5,value6"},
             {"ParameterKey": "key3", "ParameterValue": "value7,value8,value9"}
-        ])
+        ]
 
     def test_format_parameters_with_none_and_list_values(self):
         parameters = {
@@ -844,10 +916,14 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
             "key3": ["value7", "value8", "value9"]
         }
         formatted_parameters = self.stack._format_parameters(parameters)
-        assert sorted(formatted_parameters) == sorted([
+        sorted_formatted_parameters = sorted(
+            formatted_parameters,
+            key=lambda x: x["ParameterKey"]
+        )
+        assert sorted_formatted_parameters == [
             {"ParameterKey": "key1", "ParameterValue": "value1,value2,value3"},
             {"ParameterKey": "key3", "ParameterValue": "value7,value8,value9"}
-        ])
+        ]
 
     def test_format_parameters_with_list_and_string_values(self):
         parameters = {
@@ -856,11 +932,15 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
             "key3": ["value5", "value6", "value7"]
         }
         formatted_parameters = self.stack._format_parameters(parameters)
-        assert sorted(formatted_parameters) == sorted([
+        sorted_formatted_parameters = sorted(
+            formatted_parameters,
+            key=lambda x: x["ParameterKey"]
+        )
+        assert sorted_formatted_parameters == [
             {"ParameterKey": "key1", "ParameterValue": "value1,value2,value3"},
             {"ParameterKey": "key2", "ParameterValue": "value4"},
             {"ParameterKey": "key3", "ParameterValue": "value5,value6,value7"}
-        ])
+        ]
 
     def test_format_parameters_with_none_list_and_string_values(self):
         parameters = {
@@ -869,10 +949,14 @@ environment_config={'key': 'val'}, connection_manager=connection_manager)"
             "key3": None
         }
         formatted_parameters = self.stack._format_parameters(parameters)
-        assert sorted(formatted_parameters) == sorted([
+        sorted_formatted_parameters = sorted(
+            formatted_parameters,
+            key=lambda x: x["ParameterKey"]
+        )
+        assert sorted_formatted_parameters == [
             {"ParameterKey": "key1", "ParameterValue": "value1,value2,value3"},
             {"ParameterKey": "key2", "ParameterValue": "value4"},
-        ])
+        ]
 
     @patch("sceptre.stack.Stack.describe")
     def test_get_status_with_created_stack(self, mock_describe):
